@@ -99,3 +99,62 @@ test_results %>%
 ```
 
 This figure suggests a very wide range in the rate at which homicides are solved -- Chicago is noticeably high and, given the narrowness of the CI, likely is the location of many homicides. 
+
+## Problem 2
+
+I will create a tidy dataframe containing data from all participants, including the subject ID, arm, and observations over time.
+
+#### Start with a dataframe containing all file name.Iterate over file names and read in data for each subject and saving the result as a new variable in the dataframe
+```{r}
+df_study = 
+  tibble(
+    file = list.files("data/problem_1/"),
+    path = str_c("data/problem_1/", file)
+        ) |> 
+    mutate(data = map(path, read_csv)) |>
+    unnest()
+df_study
+```
+
+#### And then I tidy the result; manipulate file names to include control arm and subject ID, make sure weekly observations are “tidy”, and do any other tidying that’s necessary
+
+```{r}
+tidy_df = 
+  df_study |> 
+  mutate(
+    file = str_remove(file, ".csv"),
+        ) |>
+  separate(file, into = c("arm", "subject_id"), sep = "_") |>
+  pivot_longer(
+    cols = week_1:week_8,
+    names_to = "week",
+    names_prefix = "week_",
+    values_to = "observations"
+              ) |>
+  select(subject_id, arm, week, observations)
+tidy_df
+```
+
+#### Next I will make a spaghetti plot showing observations on each subject over time
+
+```{r}
+tidy_df |> 
+  ggplot(aes(x = week, y = observations, group = subject_id, color = arm)) +
+  geom_point() +
+  geom_path() +
+  facet_grid( ~ arm) +
+  labs(title = "Observations on Each Subject over Time",
+       x = "Week",
+       y = "Observations") 
+```
+
+#### Finally, I will comment on differences between groups.
+- In the control arm:
+  - The observations fluctuate without a clear overall trend.
+  There is no consistent upward or downward pattern in observations from week 1 to 8.
+
+- In the experiment arm:
+  - The overall trend in observations is upward over time.
+  - Unlike the control group, there is a noticeable increase in observations from week 1 to 8.
+
+- Therefore, the difference trends between groups suggests a potential difference in the response to treatment between the control and experiment groups, with the experiment group showing a more systematic increase in observations over time.

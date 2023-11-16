@@ -200,17 +200,7 @@ sim_results
 
 #### Then I will repeat the above for μ={1,2,3,4,5,6}
 
-```{r}
-output = vector("list", length = 5000)
-
-for (i in 1:5000) {
-  
-  output[[i]] = sim_test(mu=0)
-  
-}
-
-bind_rows(output)
-
+```{r, cache=TRUE}
 sim_result = tibble(
   mu = c(1,2,3,4,5,6)
 ) |> 
@@ -221,12 +211,29 @@ sim_result = tibble(
   select(-output_lists) |> 
   unnest(estimate_df)
 
+sim_result
+```
+
+#### Next I will include 0 into μ={1,2,3,4,5,6} for plot
+
+```{r, cache=TRUE}
+sim_result_plot = tibble(
+  mu = c(0,1,2,3,4,5,6)
+) |> 
+  mutate(
+    output_lists = map(mu, ~rerun(5000,sim_test(30,.x,5))),
+    estimate_df = map(output_lists, bind_rows)
+        ) |>
+  select(-output_lists) |> 
+  unnest(estimate_df)
+
+sim_result_plot
 ```
 
 #### Then I will make a plot showing the proportion of times the null was rejected.
 
 ```{r}
-plot_power = sim_result |> 
+sim_result_plot |> 
   mutate(
     decision = case_when(
       p_value < 0.05 ~ "reject",
@@ -249,7 +256,7 @@ plot_power = sim_result |>
     y = "Power",
     title = "Plot: Power of Test")
 
-plot_power
+sim_result_plot
 ```
 
 - We can see from the graph, the power increases as effect size increases. The association between effect size and power is positive.
@@ -258,7 +265,7 @@ plot_power
 #### Then I will make another plot showing the average estimate of μ̂ on the y axis and the true value of μ on the x axis.
 
 ```{r}
-sim_result |> 
+sim_result_plot |> 
   mutate(
     decision = case_when(
       p_value < 0.05 ~ "reject",
@@ -278,13 +285,13 @@ sim_result |>
      title = "Average Estimtaed Mean vs. True means"
   ) 
 
-sim_result
+sim_result_plot
 ```
 
 #### Then I will make a second plot the average estimate of μ̂ only in samples for which the null was rejected on the y axis and the true value of μ on the x axis.
 
 ```{r}
-sim_result |> 
+sim_result_plot |> 
   mutate(
     decision = case_when(
       p_value < 0.05 ~ "reject",
@@ -305,7 +312,7 @@ sim_result |>
      title = "Average Estimtaed Mean of rejection vs. True means"
   ) 
   
-sim_result
+sim_result_plot
 ```
 
 - At the beginning of the graph, around the effect size before 4, the sample average of μ̂ across tests for which the null is rejected does not approximatly equal to the true value of μ. 

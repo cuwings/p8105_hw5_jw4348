@@ -158,3 +158,156 @@ tidy_df |>
   - Unlike the control group, there is a noticeable increase in observations from week 1 to 8.
 
 - Therefore, the difference trends between groups suggests a potential difference in the response to treatment between the control and experiment groups, with the experiment group showing a more systematic increase in observations over time.
+
+## Problem 3
+
+#### First I will set the design elements
+```{r}
+sim_test = function(n = 30, mu, sigma = 5) {
+  
+  x_vec = tibble(
+    x = rnorm(n = n, mean = mu, sd = sigma),
+  )
+  
+t_test_result = x_vec |>
+    summarize(
+      mu_hat = t.test(x_vec,conf.level = 0.95) |>
+        broom::tidy() |>
+        pull(estimate),
+      p_value = t.test(x_vec,conf.level = 0.95) |>
+        broom::tidy() |>
+        pull(p.value)
+    )
+}
+
+```
+
+#### Then I will iterate by setting μ=0 and generate 5000 datasets from the model
+
+```{r}
+output = vector("list", length = 5000)
+
+for (i in 1:5000) {
+  
+  output[[i]] = sim_test(mu=0)
+  
+}
+
+sim_results = bind_rows(output)
+
+sim_results
+```
+
+#### Then I will repeat the above for μ={1,2,3,4,5,6}
+
+```{r}
+output = vector("list", length = 5000)
+
+for (i in 1:5000) {
+  
+  output[[i]] = sim_test(mu=0)
+  
+}
+
+bind_rows(output)
+
+sim_result = tibble(
+  mu = c(1,2,3,4,5,6)
+) |> 
+  mutate(
+    output_lists = map(mu, ~rerun(5000,sim_test(30,.x,5))),
+    estimate_df = map(output_lists, bind_rows)
+        ) |>
+  select(-output_lists) |> 
+  unnest(estimate_df)
+
+```
+
+#### Then I will make a plot showing the proportion of times the null was rejected.
+
+```{r}
+plot_power = sim_result |> 
+  mutate(
+    decision = case_when(
+      p_value < 0.05 ~ "reject",
+      p_value >= 0.05 ~ "fail to reject"
+                        )
+        ) |> 
+  group_by(mu) |> 
+  summarise(
+    all_decision = n(),
+    reject = sum(decision == "reject")
+  ) |> 
+  mutate(
+    power = reject/all_decision
+         ) |> 
+  ggplot(aes(x = mu, y = power, color = mu)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    x = "True means",
+    y = "Power",
+    title = "Plot: Power of Test")
+
+plot_power
+```
+
+- We can see from the graph, the power increases as effect size increases. The association between effect size and power is positive.
+- Larger effect sizes make differences between groups more noticeable, leading to a greater likelihood of detecting a significant effect.
+
+#### Then I will make another plot showing the average estimate of μ̂ on the y axis and the true value of μ on the x axis.
+
+```{r}
+sim_result |> 
+  mutate(
+    decision = case_when(
+      p_value < 0.05 ~ "reject",
+      p_value >= 0.05 ~ "fail to reject"
+                        )
+        ) |>
+  group_by(mu) |> 
+  summarise(
+    average_mu_hat = mean(mu_hat)
+  ) |> 
+  ggplot(aes(x = mu , y = average_mu_hat, color = mu )) +
+  geom_point() +
+  geom_line() +
+  labs(
+     x = "True Means",
+     y = "Average Mean Estimate",
+     title = "Average Estimtaed Mean vs. True means"
+  ) 
+
+sim_result
+```
+
+#### Then I will make a second plot the average estimate of μ̂ only in samples for which the null was rejected on the y axis and the true value of μ on the x axis.
+
+```{r}
+sim_result |> 
+  mutate(
+    decision = case_when(
+      p_value < 0.05 ~ "reject",
+      p_value >= 0.05 ~ "fail to reject"
+                        )
+        ) |>
+  group_by(mu) |> 
+  filter(decision == "reject") |>
+  summarise(
+    average_mu_hat = mean(mu_hat)
+  ) |> 
+  ggplot(aes(x = mu , y = average_mu_hat, color = mu )) +
+  geom_point() +
+  geom_line() +
+    labs(
+     x = "True Means",
+     y = "Average Mean Estimate of Reject the Null",
+     title = "Average Estimtaed Mean of rejection vs. True means"
+  ) 
+  
+sim_result
+```
+
+- At the beginning of the graph, around the effect size before 4, the sample average of μ̂ across tests for which the null is rejected does not approximatly equal to the true value of μ. 
+- However, when effect size is equal and greater than 4, the sample average of μ̂ across tests for which the null is rejected approximately equal to the true value of μ.
+- The reason can be the power of a statistical test to detect a true effect is influenced by both the effect size and sample size. A smaller effect size makes it challenging to detect a significant difference, especially with a fixed small sample size, as the signal from the difference is weaker. Larger effect sizes, on the other hand, provide a more noticeable and substantial difference, enhancing the test's ability to identify significant departures from the null hypothesis. As the effect size increases, so does the statistical power, reflecting the test's increased likelihood of correctly rejecting a false null hypothesis when a true effect is present. 
